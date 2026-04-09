@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monthly Cashflow — Kalana & Sugandi</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+  <script src="https://unpkg.com/recharts@2.10.4/umd/Recharts.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.2/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f0f4f8; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const {
+      BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+      XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+    } = Recharts;
+    const { useState, useEffect } = React;
+
+    const INITIAL_DATA = {
+      "Jan 2026": {
+        Salary: 15581, "IP1 (net)": 2022, "Other income": 0,
+        "Mortgage repayments": 4069, Rent: 2880, Insurance: 358, Utilities: 235, Subscriptions: 40, "Gym/fitness": 187,
+        Groceries: 839, Fuel: 222, Health: 505, Vehicle: 832, Work: 1001, "Parking/tolls/transport": 26,
+        "Eating out": 1025, Coffee: 23, Alcohol: 206, Shopping: 3844, Entertainment: 91,
+        Holidays: 2236, "Gifts/donations": 231, "Beauty/hair/laser": 119, Investing: 2400, Notes: ""
+      },
+      "Feb 2026": {
+        Salary: 15279, "IP1 (net)": 1033, "Other income": 0,
+        "Mortgage repayments": 4133, Rent: 2880, Insurance: 358, Utilities: 397, Subscriptions: 53, "Gym/fitness": 124,
+        Groceries: 780, Fuel: 274, Health: 420, Vehicle: 0, Work: 0, "Parking/tolls/transport": 263,
+        "Eating out": 976, Coffee: 30, Alcohol: 0, Shopping: 2700, Entertainment: 470,
+        Holidays: 1704, "Gifts/donations": 515, "Beauty/hair/laser": 81, Investing: 2400, Notes: ""
+      },
+      "Mar 2026": {
+        Salary: 16033, "IP1 (net)": 1033, "Other income": 40,
+        "Mortgage repayments": 3921, Rent: 3600, Insurance: 161, Utilities: 88, Subscriptions: 218, "Gym/fitness": 124,
+        Groceries: 548, Fuel: 320, Health: 198, Vehicle: 1213, Work: 1335, "Parking/tolls/transport": 254,
+        "Eating out": 863, Coffee: 174, Alcohol: 47, Shopping: 1908, Entertainment: 43,
+        Holidays: 3273, "Gifts/donations": 80, "Beauty/hair/laser": 432, Investing: 2400,
+        Notes: "ANZCA ASM Wellington ($1,250). TMC ring ($2,040) in Shopping. Wedding vendor Renee Green Creative ($1,950) in Holidays. Westin Perth ($1,263). Babyboo+Iconic ($990). Allianz insurance. Spotify/PlayStation/CPD99 subs. 5× rent weeks."
+      }
+    };
+
+    const INCOME    = ["Salary", "IP1 (net)", "Other income"];
+    const FIXED     = ["Mortgage repayments", "Rent", "Insurance", "Utilities", "Subscriptions", "Gym/fitness"];
+    const VARIABLE  = ["Groceries", "Fuel", "Health", "Vehicle", "Work", "Parking/tolls/transport"];
+    const LIFESTYLE = ["Eating out", "Coffee", "Alcohol", "Shopping", "Entertainment", "Holidays", "Gifts/donations", "Beauty/hair/laser"];
+    const PIE_COLORS = ["#6366f1","#06b6d4","#f43f5e","#f59e0b","#10b981","#8b5cf6","#ec4899","#14b8a6","#f97316","#84cc16"];
+
+    const fmt = (n) => {
+      const abs = Math.abs(Math.round(n));
+      return (n < 0 ? "-$" : "$") + abs.toLocaleString("en-AU");
+    };
+
+    const CustomTooltip = ({ active, payload, label }) => {
+      if (!active || !payload?.length) return null;
+      return (
+        <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", fontSize: 12, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
+          <div style={{ fontWeight: 700, marginBottom: 4, color: "#1e293b" }}>{label}</div>
+          {payload.map((p, i) => (
+            <div key={i} style={{ color: p.color || "#475569" }}>{p.name}: {fmt(p.value)}</div>
+          ))}
+        </div>
+      );
+    };
+
+    function SummaryCard({ label, value, color, sub }) {
+      return (
+        <div style={{ background: "white", borderRadius: 12, padding: "14px 18px", flex: "1 1 140px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", borderTop: `3px solid ${color}` }}>
+          <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color, marginTop: 4, lineHeight: 1 }}>{fmt(value)}</div>
+          {sub && <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 3 }}>{sub}</div>}
+        </div>
+      );
+    }
+
+    function InputRow({ label, value, onChange }) {
+      const [focused, setFocused] = useState(false);
+      return (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #f8fafc" }}>
+          <label style={{ fontSize: 13, color: "#475569", flex: 1, paddingRight: 8 }}>{label}</label>
+          <div style={{ position: "relative" }}>
+            <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13, pointerEvents: "none" }}>$</span>
+            <input
+              type="number"
+              value={value || ""}
+              onChange={e => onChange(e.target.value)}
+              placeholder="0"
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              style={{ width: 100, paddingLeft: 20, paddingRight: 6, paddingTop: 5, paddingBottom: 5, border: `1px solid ${focused ? "#6366f1" : "#e2e8f0"}`, borderRadius: 6, fontSize: 13, textAlign: "right", outline: "none", background: "#fafafa" }}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    function Section({ title, color, children, total }) {
+      return (
+        <div style={{ background: "white", borderRadius: 12, padding: "14px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingBottom: 8, borderBottom: `2px solid ${color}20` }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color, textTransform: "uppercase", letterSpacing: "0.06em" }}>{title}</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color }}>{fmt(total)}</div>
+          </div>
+          {children}
+        </div>
+      );
+    }
+
+    function MiniBarChart({ data, dataKey, color }) {
+      return (
+        <ResponsiveContainer width="100%" height={120}>
+          <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+            <XAxis dataKey="month" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 10 }} tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(1)}k` : `$${v}`} axisLine={false} tickLine={false} width={38} />
+            <Tooltip content={<CustomTooltip />} />
+            <Bar dataKey={dataKey} name={dataKey} fill={color} radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      );
+    }
+
+    function CashflowTracker() {
+      const [data, setData] = useState(INITIAL_DATA);
+      const [selectedMonth, setSelectedMonth] = useState("Mar 2026");
+      const [tab, setTab] = useState("overview");
+      const [loaded, setLoaded] = useState(false);
+      const [showAdd, setShowAdd] = useState(false);
+      const [newName, setNewName] = useState("");
+
+      useEffect(() => {
+        try {
+          const saved = localStorage.getItem("cashflow-data-v3");
+          if (saved) setData(JSON.parse(saved));
+        } catch {}
+        setLoaded(true);
+      }, []);
+
+      useEffect(() => {
+        if (!loaded) return;
+        try {
+          localStorage.setItem("cashflow-data-v3", JSON.stringify(data));
+        } catch {}
+      }, [data, loaded]);
+
+      const months = Object.keys(data);
+      const cur = data[selectedMonth] || {};
+      const allExpenseKeys = [...FIXED, ...VARIABLE, ...LIFESTYLE];
+
+      const totalIncome   = INCOME.reduce((s, k) => s + (cur[k] || 0), 0);
+      const totalExpenses = allExpenseKeys.reduce((s, k) => s + (cur[k] || 0), 0);
+      const invested      = cur["Investing"] || 0;
+      const netCashflow   = totalIncome - totalExpenses - invested;
+      const savingsRate   = totalIncome > 0 ? Math.round(((netCashflow + invested) / totalIncome) * 100) : 0;
+
+      const fixedTotal     = FIXED.reduce((s, k) => s + (cur[k] || 0), 0);
+      const variableTotal  = VARIABLE.reduce((s, k) => s + (cur[k] || 0), 0);
+      const lifestyleTotal = LIFESTYLE.reduce((s, k) => s + (cur[k] || 0), 0);
+
+      const update = (field, val) => {
+        setData(p => ({ ...p, [selectedMonth]: { ...p[selectedMonth], [field]: parseFloat(val) || 0 } }));
+      };
+
+      const addMonth = () => {
+        if (!newName.trim()) return;
+        const empty = {};
+        [...INCOME, ...FIXED, ...VARIABLE, ...LIFESTYLE, "Investing"].forEach(k => empty[k] = 0);
+        empty.Notes = "";
+        setData(p => ({ ...p, [newName.trim()]: empty }));
+        setSelectedMonth(newName.trim());
+        setNewName("");
+        setShowAdd(false);
+        setTab("data");
+      };
+
+      const trendData = months.map(m => {
+        const d = data[m];
+        const inc = INCOME.reduce((s, k) => s + (d[k] || 0), 0);
+        const exp = allExpenseKeys.reduce((s, k) => s + (d[k] || 0), 0);
+        const inv = d["Investing"] || 0;
+        const label = m
+          .replace("January","Jan").replace("February","Feb").replace("March","Mar")
+          .replace("April","Apr").replace("June","Jun").replace("July","Jul")
+          .replace("August","Aug").replace("September","Sep").replace("October","Oct")
+          .replace("November","Nov").replace("December","Dec")
+          .replace(" 2026","").replace(" 2027","").replace(" 2025","");
+        return {
+          month: label,
+          income: Math.round(inc),
+          expenses: Math.round(exp + inv),
+          net: Math.round(inc - exp - inv),
+          "Eating out": Math.round(d["Eating out"] || 0),
+          Coffee: Math.round(d["Coffee"] || 0),
+          Shopping: Math.round(d["Shopping"] || 0),
+          Groceries: Math.round(d["Groceries"] || 0),
+          Investing: Math.round(inv),
+        };
+      });
+
+      const pieData = [
+        { name: "Fixed",     value: Math.round(fixedTotal),     color: "#6366f1" },
+        { name: "Variable",  value: Math.round(variableTotal),  color: "#06b6d4" },
+        { name: "Lifestyle", value: Math.round(lifestyleTotal), color: "#f43f5e" },
+        { name: "Investing", value: Math.round(invested),       color: "#f59e0b" },
+      ].filter(d => d.value > 0);
+
+      const lifestylePie = LIFESTYLE.map((k, i) => ({
+        name: k, value: Math.round(cur[k] || 0), color: PIE_COLORS[i % PIE_COLORS.length]
+      })).filter(d => d.value > 0).sort((a, b) => b.value - a.value);
+
+      const tabStyle = (active) => ({
+        flex: 1, padding: "9px 0", borderRadius: 8, border: "none", cursor: "pointer",
+        fontSize: 13, fontWeight: 700,
+        background: active ? "#6366f1" : "transparent",
+        color: active ? "white" : "#94a3b8",
+      });
+
+      const monthBtnStyle = (active) => ({
+        padding: "5px 14px", borderRadius: 20,
+        border: active ? "2px solid #6366f1" : "1px solid #e2e8f0",
+        cursor: "pointer", fontSize: 12, fontWeight: 700,
+        background: active ? "#6366f1" : "white",
+        color: active ? "white" : "#64748b",
+        whiteSpace: "nowrap"
+      });
+
+      const cardStyle = { background: "white", borderRadius: 12, padding: "14px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" };
+      const chartTitleStyle = { fontSize: 12, fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 };
+      const grid2Style = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 };
+
+      return (
+        <div style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", background: "#f0f4f8", minHeight: "100vh", padding: 16 }}>
+
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: "#0f172a" }}>💸 Monthly Cashflow</h1>
+              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>Kalana & Sugandi · {selectedMonth}</div>
+            </div>
+            <div style={{
+              background: savingsRate >= 20 ? "#dcfce7" : savingsRate >= 10 ? "#fef3c7" : "#fee2e2",
+              borderRadius: 20, padding: "5px 14px", fontSize: 12, fontWeight: 800,
+              color: savingsRate >= 20 ? "#16a34a" : savingsRate >= 10 ? "#d97706" : "#dc2626"
+            }}>
+              {savingsRate}% savings rate
+            </div>
+          </div>
+
+          {/* Month Selector */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+            {months.map(m => (
+              <button key={m} style={monthBtnStyle(m === selectedMonth)} onClick={() => setSelectedMonth(m)}>{m}</button>
+            ))}
+            {!showAdd ? (
+              <button onClick={() => setShowAdd(true)} style={{ padding: "5px 14px", borderRadius: 20, border: "1px dashed #6366f1", cursor: "pointer", fontSize: 12, fontWeight: 700, background: "transparent", color: "#6366f1" }}>
+                + Add Month
+              </button>
+            ) : (
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <input autoFocus value={newName} onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && addMonth()}
+                  placeholder="Apr 2026"
+                  style={{ padding: "5px 12px", border: "1px solid #6366f1", borderRadius: 20, fontSize: 12, outline: "none", width: 90 }} />
+                <button onClick={addMonth} style={{ ...monthBtnStyle(true), padding: "5px 12px" }}>Add</button>
+                <button onClick={() => { setShowAdd(false); setNewName(""); }} style={{ ...monthBtnStyle(false), padding: "5px 10px" }}>✕</button>
+              </div>
+            )}
+          </div>
+
+          {/* Summary Cards */}
+          <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+            <SummaryCard label="Total Income"    value={totalIncome}   color="#10b981" sub="Salary + IP1 + Other" />
+            <SummaryCard label="Total Expenses"  value={totalExpenses} color="#f43f5e" sub="Excl. investing" />
+            <SummaryCard label="Net Cashflow"    value={netCashflow}   color={netCashflow >= 0 ? "#6366f1" : "#f43f5e"} sub="After all outgoings" />
+            <SummaryCard label="Invested"        value={invested}      color="#f59e0b" sub="Pearler + BTC DCA" />
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display: "flex", gap: 3, background: "white", borderRadius: 10, padding: 4, boxShadow: "0 1px 3px rgba(0,0,0,0.08)", marginBottom: 14 }}>
+            {[["overview","📊 Overview"],["data","✏️ Edit Data"],["charts","📈 Charts"]].map(([id, label]) => (
+              <button key={id} style={tabStyle(tab === id)} onClick={() => setTab(id)}>{label}</button>
+            ))}
+          </div>
+
+          {/* OVERVIEW */}
+          {tab === "overview" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={grid2Style}>
+                <div style={cardStyle}>
+                  <div style={chartTitleStyle}>Spend Breakdown</div>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={52} outerRadius={78} paddingAngle={3} dataKey="value">
+                        {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                      </Pie>
+                      <Tooltip formatter={(v) => fmt(v)} />
+                      <Legend formatter={(v, e) => `${v}: ${fmt(e.payload.value)}`} wrapperStyle={{ fontSize: 11 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div style={cardStyle}>
+                  <div style={chartTitleStyle}>Net Cashflow Trend</div>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={trendData} margin={{ top: 4, right: 8, bottom: 0, left: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(1)}k`} axisLine={false} tickLine={false} width={42} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="net" name="Net Cashflow" radius={[5,5,0,0]}>
+                        {trendData.map((e, i) => <Cell key={i} fill={e.net >= 0 ? "#6366f1" : "#f43f5e"} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {lifestylePie.length > 0 && (
+                <div style={cardStyle}>
+                  <div style={chartTitleStyle}>Lifestyle — {selectedMonth}</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {lifestylePie.map((item, i) => (
+                      <div key={i} style={{ padding: "5px 12px", borderRadius: 20, background: item.color + "18", border: `1px solid ${item.color}40`, fontSize: 12, fontWeight: 700, color: item.color }}>
+                        {item.name}: {fmt(item.value)}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 10, fontSize: 11, color: "#94a3b8", display: "flex", gap: 20, flexWrap: "wrap" }}>
+                    <span>Lifestyle: <strong style={{ color: "#475569" }}>{fmt(lifestyleTotal)}</strong></span>
+                    <span>% of income: <strong style={{ color: lifestyleTotal / totalIncome > 0.4 ? "#f43f5e" : "#10b981" }}>{totalIncome ? Math.round(lifestyleTotal / totalIncome * 100) : 0}%</strong></span>
+                    <span>Fixed: <strong style={{ color: "#475569" }}>{fmt(fixedTotal)}</strong></span>
+                    <span>Variable: <strong style={{ color: "#475569" }}>{fmt(variableTotal)}</strong></span>
+                  </div>
+                  {cur.Notes && (
+                    <div style={{ marginTop: 8, fontSize: 12, color: "#64748b", background: "#f8fafc", borderRadius: 8, padding: "8px 12px", borderLeft: "3px solid #6366f1" }}>
+                      📝 {cur.Notes}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={cardStyle}>
+                <div style={chartTitleStyle}>Income vs Total Outgoings</div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={trendData} margin={{ top: 4, right: 8, bottom: 0, left: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} axisLine={false} tickLine={false} width={38} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="income"   name="Income"          fill="#10b981" radius={[4,4,0,0]} />
+                    <Bar dataKey="expenses" name="Total Outgoings" fill="#f43f5e" radius={[4,4,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* DATA ENTRY */}
+          {tab === "data" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <Section title="💰 Income" color="#10b981" total={totalIncome}>
+                {INCOME.map(k => <InputRow key={k} label={k} value={cur[k]} onChange={v => update(k, v)} />)}
+              </Section>
+              <div style={grid2Style}>
+                <Section title="🏠 Fixed Expenses" color="#6366f1" total={fixedTotal}>
+                  {FIXED.map(k => <InputRow key={k} label={k} value={cur[k]} onChange={v => update(k, v)} />)}
+                </Section>
+                <Section title="🔧 Variable" color="#06b6d4" total={variableTotal}>
+                  {VARIABLE.map(k => <InputRow key={k} label={k} value={cur[k]} onChange={v => update(k, v)} />)}
+                </Section>
+              </div>
+              <Section title="🍽️ Lifestyle" color="#f43f5e" total={lifestyleTotal}>
+                <div style={grid2Style}>
+                  <div>{LIFESTYLE.slice(0,4).map(k => <InputRow key={k} label={k} value={cur[k]} onChange={v => update(k, v)} />)}</div>
+                  <div>{LIFESTYLE.slice(4).map(k => <InputRow key={k} label={k} value={cur[k]} onChange={v => update(k, v)} />)}</div>
+                </div>
+              </Section>
+              <Section title="📈 Investing" color="#f59e0b" total={invested}>
+                <InputRow label="Pearler + BTC DCA" value={cur["Investing"]} onChange={v => update("Investing", v)} />
+              </Section>
+              <div style={cardStyle}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>📝 Notes</div>
+                <textarea
+                  value={cur.Notes || ""}
+                  onChange={e => setData(p => ({ ...p, [selectedMonth]: { ...p[selectedMonth], Notes: e.target.value } }))}
+                  placeholder="Big expenses, context, anomalies this month..."
+                  style={{ width: "100%", padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13, minHeight: 60, resize: "vertical", outline: "none", boxSizing: "border-box", color: "#475569", background: "#fafafa" }}
+                />
+              </div>
+              <div style={{ background: "#0f172a", borderRadius: 12, padding: "12px 16px", display: "flex", gap: 16, flexWrap: "wrap" }}>
+                {[["Income", fmt(totalIncome), "#10b981"],["Expenses", fmt(totalExpenses), "#f43f5e"],["Invested", fmt(invested), "#f59e0b"],["Net", fmt(netCashflow), netCashflow >= 0 ? "#6366f1" : "#f43f5e"]].map(([label, value, color]) => (
+                  <div key={label} style={{ flex: 1, minWidth: 80 }}>
+                    <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>{label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* CHARTS */}
+          {tab === "charts" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={cardStyle}>
+                <div style={chartTitleStyle}>Income vs Total Outgoings</div>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={trendData} margin={{ top: 4, right: 12, bottom: 0, left: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} axisLine={false} tickLine={false} width={42} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Line type="monotone" dataKey="income"   name="Income"          stroke="#10b981" strokeWidth={2.5} dot={{ r: 5, fill: "#10b981" }} />
+                    <Line type="monotone" dataKey="expenses" name="Total Outgoings" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 5, fill: "#f43f5e" }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div style={grid2Style}>
+                <div style={cardStyle}>
+                  <div style={chartTitleStyle}>🍽️ Eating Out</div>
+                  <MiniBarChart data={trendData} dataKey="Eating out" color="#f43f5e" />
+                </div>
+                <div style={cardStyle}>
+                  <div style={chartTitleStyle}>☕ Coffee</div>
+                  <MiniBarChart data={trendData} dataKey="Coffee" color="#f59e0b" />
+                </div>
+              </div>
+
+              <div style={grid2Style}>
+                <div style={cardStyle}>
+                  <div style={chartTitleStyle}>🛒 Groceries</div>
+                  <MiniBarChart data={trendData} dataKey="Groceries" color="#06b6d4" />
+                </div>
+                <div style={cardStyle}>
+                  <div style={chartTitleStyle}>🛍️ Shopping</div>
+                  <MiniBarChart data={trendData} dataKey="Shopping" color="#8b5cf6" />
+                </div>
+              </div>
+
+              <div style={cardStyle}>
+                <div style={chartTitleStyle}>📈 Investing</div>
+                <ResponsiveContainer width="100%" height={130}>
+                  <BarChart data={trendData} margin={{ top: 4, right: 12, bottom: 0, left: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v/1000).toFixed(1)}k`} axisLine={false} tickLine={false} width={42} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="Investing" name="Investing" fill="#f59e0b" radius={[5,5,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {lifestylePie.length > 0 && (
+                <div style={cardStyle}>
+                  <div style={chartTitleStyle}>Lifestyle Breakdown — {selectedMonth}</div>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie data={lifestylePie} cx="40%" cy="50%" outerRadius={88} paddingAngle={2} dataKey="value"
+                        label={({ percent }) => percent > 0.05 ? `${Math.round(percent * 100)}%` : ""} labelLine={false}>
+                        {lifestylePie.map((e, i) => <Cell key={i} fill={e.color} />)}
+                      </Pie>
+                      <Tooltip formatter={(v) => fmt(v)} />
+                      <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: 11 }}
+                        formatter={(v, e) => `${v}: ${fmt(e.payload.value)}`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ marginTop: 12, fontSize: 10, color: "#cbd5e1", textAlign: "center" }}>
+            Auto-saved to browser · {new Date().toLocaleDateString("en-AU")}
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<CashflowTracker />);
+  </script>
+</body>
+</html>
