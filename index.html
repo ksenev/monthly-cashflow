@@ -139,7 +139,7 @@
 
     function CashflowTracker() {
       const [data, setData] = useState(INITIAL_DATA);
-      const [selectedMonth, setSelectedMonth] = useState("Mar 2026");
+      const [selectedMonth, setSelectedMonth] = useState("Apr 2026");
       const [tab, setTab] = useState("overview");
       const [loaded, setLoaded] = useState(false);
       const [showAdd, setShowAdd] = useState(false);
@@ -147,8 +147,17 @@
 
       useEffect(() => {
         try {
-          const saved = localStorage.getItem("cashflow-data-v3");
-          if (saved) setData(JSON.parse(saved));
+          const saved = localStorage.getItem("cashflow-data-v4");
+          if (saved) {
+            // Merge: localStorage wins for existing months, but always include any NEW months from INITIAL_DATA
+            const parsed = JSON.parse(saved);
+            const merged = { ...INITIAL_DATA, ...parsed };
+            // Ensure any new months added to INITIAL_DATA show up even if localStorage existed
+            Object.keys(INITIAL_DATA).forEach(m => {
+              if (!parsed[m]) merged[m] = INITIAL_DATA[m];
+            });
+            setData(merged);
+          }
         } catch {}
         setLoaded(true);
       }, []);
@@ -156,7 +165,7 @@
       useEffect(() => {
         if (!loaded) return;
         try {
-          localStorage.setItem("cashflow-data-v3", JSON.stringify(data));
+          localStorage.setItem("cashflow-data-v4", JSON.stringify(data));
         } catch {}
       }, [data, loaded]);
 
@@ -276,7 +285,7 @@
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 <input autoFocus value={newName} onChange={e => setNewName(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && addMonth()}
-                  placeholder="Apr 2026"
+                  placeholder="May 2026"
                   style={{ padding: "5px 12px", border: "1px solid #6366f1", borderRadius: 20, fontSize: 12, outline: "none", width: 90 }} />
                 <button onClick={addMonth} style={{ ...monthBtnStyle(true), padding: "5px 12px" }}>Add</button>
                 <button onClick={() => { setShowAdd(false); setNewName(""); }} style={{ ...monthBtnStyle(false), padding: "5px 10px" }}>✕</button>
